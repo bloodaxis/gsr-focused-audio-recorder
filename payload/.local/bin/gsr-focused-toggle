@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/gsr-focused-recorder"
+readonly SESSION_FILE="$STATE_DIR/session-active"
+
+mkdir -p "$STATE_DIR"
+
+if [[ -e "$SESSION_FILE" ]]; then
+    systemctl --user stop gsr-focused-recorder.service
+    rm -f -- "$SESSION_FILE"
+    notify-send "GPU Screen Recorder" "Focused application recording stopped"
+    exit 0
+fi
+
+: >"$SESSION_FILE"
+if ! "$HOME/.local/bin/gsr-focus-event" "${1:-}"; then
+    rm -f -- "$SESSION_FILE"
+    notify-send -u critical "GPU Screen Recorder" "Recording failed to start"
+    exit 1
+fi
+
+notify-send "GPU Screen Recorder" "Focused application recording started"

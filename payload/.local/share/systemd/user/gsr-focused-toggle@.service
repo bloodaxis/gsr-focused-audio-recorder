@@ -1,0 +1,6 @@
+[Unit]
+Description=Toggle focused application recording for %i
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gsr-focused-toggle %i

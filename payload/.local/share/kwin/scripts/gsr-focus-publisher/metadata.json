@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Name": "GPU Screen Recorder Focused Toggle",
+        "Description": "Toggles focused-application recording from a global shortcut",
+        "Icon": "media-record",
+        "Id": "gsr-focus-publisher",
+        "Version": "1.0",
+        "License": "GPL-3.0"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js",
+    "KPackageStructure": "KWin/Script"
+}

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly APP_ID="com.dec05eba.gpu_screen_recorder"
+readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/gsr-focused-recorder"
+readonly STATE_FILE="$STATE_DIR/focus.env"
+readonly PID_FILE="$STATE_DIR/recorder.pid"
+readonly OUTPUT_FILE="$STATE_DIR/recorder.output"
+readonly OUTPUT_DIR="${GSR_OUTPUT_DIR:-$HOME/Videos/GPUScreenRecorder}"
+
+[[ -r "$STATE_FILE" ]] || { echo "Missing focus state: $STATE_FILE" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$STATE_FILE"
+
+[[ -n "${GSR_FOCUSED_CLASS:-}" && -n "${GSR_FOCUSED_OUTPUT:-}" ]] || exit 0
+mkdir -p "$OUTPUT_DIR"
+
+mapfile -t audio_apps < <(
+    timeout --kill-after=1 3 \
+        flatpak run --command=gpu-screen-recorder "$APP_ID" \
+        --list-application-audio 2>/dev/null | sed '/^[[:space:]]*$/d' || true
+)
+
+normalize() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]'
+}
+
+class_key="$(normalize "$GSR_FOCUSED_CLASS")"
+title_key="$(normalize "$GSR_FOCUSED_TITLE")"
+audio_app=""
+for candidate in "${audio_apps[@]}"; do
+    candidate_key="$(normalize "$candidate")"
+    candidate_stem="$(normalize "${candidate%.[Ee][Xx][Ee]}")"
+    [[ -n "$candidate_key" ]] || continue
+    if [[ "$class_key" == *"$candidate_key"* || "$candidate_key" == *"$class_key"* ||
+          "$title_key" == *"$candidate_key"* ||
+          ( -n "$candidate_stem" && "$title_key" == *"$candidate_stem"* ) ]]; then
+        audio_app="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$audio_app" ]]; then
+    echo "No application-audio match for class '$GSR_FOCUSED_CLASS' title '$GSR_FOCUSED_TITLE'; not recording"
+    exit 0
+fi
+
+# The audio application label is generally the real process executable for
+# Proton/Wine games (for example Hellforged.exe), unlike steam_app_<id>.
+recording_name="${audio_app:-$GSR_FOCUSED_CLASS}"
+safe_name="${recording_name//[^[:alnum:]_.-]/_}"
+output="$OUTPUT_DIR/${safe_name}_$(date +%Y-%m-%d_%H-%M-%S).mp4"
+rm -f -- "$PID_FILE"
+printf '%s\n' "$output" >"$OUTPUT_FILE"
+
+echo "Recording output '$GSR_FOCUSED_OUTPUT' with audio '$audio_app' to '$output'"
+flatpak run --command=gpu-screen-recorder "$APP_ID" \
+    -w "$GSR_FOCUSED_OUTPUT" \
+    -f "${GSR_FPS:-60}" \
+    -k "${GSR_CODEC:-hevc}" \
+    -q "${GSR_QUALITY:-ultra}" \
+    -cr "${GSR_COLOR_RANGE:-full}" \
+    -a "app:$audio_app" \
+    -ac "${GSR_AUDIO_CODEC:-opus}" \
+    -cursor "${GSR_CURSOR:-yes}" \
+    -o "$output" &
+
+# Flatpak moves the real recorder into its own scope. Locate that process and
+# retain its PID so the toggle can stop it directly later.
+for _attempt in {1..40}; do
+    while read -r candidate_pid; do
+        [[ -r "/proc/$candidate_pid/cmdline" ]] || continue
+        command_line="$(tr '\0' ' ' <"/proc/$candidate_pid/cmdline")"
+        if [[ "$command_line" == gpu-screen-recorder\ * && "$command_line" == *"$output"* ]]; then
+            printf '%s\n' "$candidate_pid" >"$PID_FILE"
+            qdbus-qt6 org.odin.GsrTray /Tray \
+                org.odin.GsrTray.SetRecording true "$output" "$candidate_pid" \
+                >/dev/null 2>&1 || true
+            exit 0
+        fi
+    done < <(pgrep -u "$(id -u)" -f '^gpu-screen-recorder ' || true)
+    sleep 0.1
+done
+
+echo "Recorder launched but its real PID could not be found" >&2
+exit 1

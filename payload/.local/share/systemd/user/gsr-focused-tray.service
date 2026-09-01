@@ -1,0 +1,13 @@
+[Unit]
+Description=Focused GPU Screen Recorder tray indicator
+PartOf=graphical-session.target
+After=graphical-session.target plasma-plasmashell.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/gsr-focused-tray
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/gsr-focused-recorder"
+readonly PID_FILE="$STATE_DIR/recorder.pid"
+readonly OUTPUT_FILE="$STATE_DIR/recorder.output"
+
+if [[ -r "$PID_FILE" ]]; then
+    recorder_pid="$(<"$PID_FILE")"
+    if [[ "$recorder_pid" =~ ^[0-9]+$ && -r "/proc/$recorder_pid/cmdline" ]]; then
+        command_line="$(tr '\0' ' ' <"/proc/$recorder_pid/cmdline")"
+        if [[ "$command_line" == gpu-screen-recorder\ * ]]; then
+            kill -INT "$recorder_pid"
+            for _attempt in {1..300}; do
+                kill -0 "$recorder_pid" 2>/dev/null || break
+                sleep 0.1
+            done
+        fi
+    fi
+fi
+
+rm -f -- "$PID_FILE" "$OUTPUT_FILE"
+qdbus-qt6 org.odin.GsrTray /Tray \
+    org.odin.GsrTray.SetRecording false "" 0 >/dev/null 2>&1 || true

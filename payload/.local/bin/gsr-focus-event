@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/gsr-focused-recorder"
+readonly STATE_FILE="$STATE_DIR/focus.env"
+
+mkdir -p "$STATE_DIR"
+
+instance="${1:-}"
+[[ "$instance" == *___*___* ]] || { echo "Invalid focus instance: $instance" >&2; exit 2; }
+GSR_FOCUSED_CLASS="${instance%%___*}"
+remainder="${instance#*___}"
+GSR_FOCUSED_OUTPUT="${remainder%%___*}"
+GSR_FOCUSED_TITLE="${remainder#*___}"
+
+# Write shell-safe values for the long-running recorder service.
+{
+    printf 'GSR_FOCUSED_CLASS=%q\n' "$GSR_FOCUSED_CLASS"
+    printf 'GSR_FOCUSED_TITLE=%q\n' "$GSR_FOCUSED_TITLE"
+    printf 'GSR_FOCUSED_OUTPUT=%q\n' "$GSR_FOCUSED_OUTPUT"
+} >"$STATE_FILE"
+
+systemctl --user restart gsr-focused-recorder.service

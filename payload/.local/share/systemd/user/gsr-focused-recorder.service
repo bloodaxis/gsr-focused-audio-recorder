@@ -1,0 +1,14 @@
+[Unit]
+Description=GPU Screen Recorder for the focused window's monitor and application audio
+After=graphical-session.target pipewire.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gsr-focused-recorder-run
+ExecStop=%h/.local/bin/gsr-focused-recorder-stop
+RemainAfterExit=yes
+TimeoutStopSec=30
+Restart=no
+
+[Install]
+WantedBy=graphical-session.target
