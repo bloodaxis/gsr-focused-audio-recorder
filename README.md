@@ -1,8 +1,17 @@
-# Focused GPU Screen Recorder
+# GPU Screen Recorder Focused Audio Recorder
 
 KDE Plasma Wayland integration that records the monitor containing the focused
 window while isolating that application's PipeWire audio. Press the same global
 shortcut again to stop and finalize the recording.
+
+> **Audio isolation is the purpose of this project:** the recording contains
+> **only the audio belonging to the window/application that was focused when
+> recording started**. It does not record general desktop audio, audio from
+> other applications, or microphone input. Video may cover the entire monitor;
+> “focused” refers specifically to which application's audio is captured.
+
+If GPU Screen Recorder cannot match the focused window to an application-audio
+source, recording is refused instead of silently capturing the wrong audio.
 
 ## Features
 
@@ -34,8 +43,8 @@ chmod +x install.sh
 Or clone it:
 
 ```bash
-git clone https://github.com/bloodaxis/gsr-focused-recorder.git
-cd gsr-focused-recorder
+git clone https://github.com/bloodaxis/gsr-focused-audio-recorder.git
+cd gsr-focused-audio-recorder
 ./install.sh
 ```
 
