@@ -1,8 +1,8 @@
 # GPU Screen Recorder Focused Audio Recorder
 
-KDE Plasma Wayland integration that records the monitor containing the focused
-window while isolating that application's PipeWire audio. Press the same global
-shortcut again to stop and finalize the recording.
+GPU Screen Recorder scripts and service that lets you automate recording only
+the audio stream of the currently focused window. Press the same global shortcut
+again to stop and finalize the recording.
 
 > **Audio isolation is the purpose of this project:** the recording contains
 > **only the audio belonging to the window/application that was focused when
