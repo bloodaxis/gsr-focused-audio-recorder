@@ -42,7 +42,10 @@ done
 
 if [[ -z "$audio_app" ]]; then
     echo "No application-audio match for class '$GSR_FOCUSED_CLASS' title '$GSR_FOCUSED_TITLE'; not recording"
-    exit 0
+    # Propagate a failed start to systemd and the toggle script. A successful
+    # exit would make the oneshot service active even though no recorder was
+    # launched, leaving session-active behind until the next hotkey press.
+    exit 1
 fi
 
 # The audio application label is generally the real process executable for
