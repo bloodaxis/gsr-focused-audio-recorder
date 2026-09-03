@@ -33,8 +33,9 @@ for candidate in "${audio_apps[@]}"; do
     candidate_stem="$(normalize "${candidate%.[Ee][Xx][Ee]}")"
     [[ -n "$candidate_key" ]] || continue
     if [[ "$class_key" == *"$candidate_key"* || "$candidate_key" == *"$class_key"* ||
-          "$title_key" == *"$candidate_key"* ||
-          ( -n "$candidate_stem" && "$title_key" == *"$candidate_stem"* ) ]]; then
+        "$title_key" == *"$candidate_key"* ||
+        ( ${#title_key} -ge 4 && "$candidate_key" == *"$title_key"* ) ||
+        ( -n "$candidate_stem" && "$title_key" == *"$candidate_stem"* ) ]]; then
         audio_app="$candidate"
         break
     fi
