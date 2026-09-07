@@ -21,7 +21,8 @@ source, recording is refused instead of silently capturing the wrong audio.
   and title, including Proton/Wine executable names.
 - Uses one shortcut for start and stop.
 - A second shortcut stops, finalizes, and opens KDE/Dolphin's YouTube share
-  dialog for the completed recording.
+  dialog for the completed recording. When nothing is recording, it shares the
+  last successfully finalized recording instead.
 - Shows recording state through a native KDE StatusNotifierItem tray helper.
 - Watches the recorder with `pidfd_open()` instead of polling.
 - Saves recordings to `~/Videos/GPUScreenRecorder` by default.
@@ -54,7 +55,8 @@ cd gsr-focused-audio-recorder
 The shortcuts are exposed in **System Settings → Keyboard → Shortcuts → KWin**:
 
 - `Meta+Ctrl+Alt+E`: start or stop normally
-- `Meta+Ctrl+Alt+Y`: stop, finalize, and open the YouTube share dialog
+- `Meta+Ctrl+Alt+Y`: stop and share the current recording, or share the last
+  finalized recording when the recorder is idle
 
 ## Repository layout
 
