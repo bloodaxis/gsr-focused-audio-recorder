@@ -14,6 +14,7 @@
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("gsr-share-youtube"));
+    app.setDesktopFileName(QStringLiteral("gsr-share-youtube"));
     app.setQuitOnLastWindowClosed(true);
 
     if (argc != 2) {
