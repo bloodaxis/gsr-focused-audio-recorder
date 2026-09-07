@@ -30,3 +30,21 @@ registerShortcut(
     "Meta+Ctrl+Alt+E",
     toggleFocusedRecording
 );
+
+function stopAndShareFocusedRecording() {
+    callDBus(
+        "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager",
+        "StartUnit",
+        "gsr-focused-stop-share.service",
+        "replace"
+    );
+}
+
+registerShortcut(
+    "gsr-focused-recording-stop-share-youtube",
+    "Stop recording and share to YouTube",
+    "Meta+Ctrl+Alt+Y",
+    stopAndShareFocusedRecording
+);

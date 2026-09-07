@@ -7,6 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core DBus Widgets)
 find_package(KF6StatusNotifierItem REQUIRED)
+find_package(KF6Purpose REQUIRED)
 
 add_executable(gsr-focused-tray main.cpp)
 target_link_libraries(gsr-focused-tray PRIVATE
@@ -17,3 +18,13 @@ target_link_libraries(gsr-focused-tray PRIVATE
 )
 
 install(TARGETS gsr-focused-tray RUNTIME DESTINATION bin)
+
+add_executable(gsr-share-youtube share-youtube.cpp)
+target_link_libraries(gsr-share-youtube PRIVATE
+    Qt6::Core
+    Qt6::Widgets
+    KF6::Purpose
+    KF6::PurposeWidgets
+)
+
+install(TARGETS gsr-share-youtube RUNTIME DESTINATION bin)

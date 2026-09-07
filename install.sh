@@ -30,8 +30,10 @@ for script in \
     gsr-focus-event \
     gsr-focused-recorder-run \
     gsr-focused-recorder-stop \
+    gsr-focused-stop-share \
     gsr-focused-toggle \
-    gsr-focused-tray; do
+    gsr-focused-tray \
+    gsr-share-youtube; do
     install -m 0755 "$PAYLOAD_DIR/.local/bin/$script" "$HOME/.local/bin/$script"
 done
 
@@ -41,6 +43,8 @@ install -m 0644 "$PAYLOAD_DIR/.local/share/systemd/user/gsr-focused-toggle@.serv
     "$HOME/.local/share/systemd/user/gsr-focused-toggle@.service"
 install -m 0644 "$PAYLOAD_DIR/.local/share/systemd/user/gsr-focused-tray.service" \
     "$HOME/.local/share/systemd/user/gsr-focused-tray.service"
+install -m 0644 "$PAYLOAD_DIR/.local/share/systemd/user/gsr-focused-stop-share.service" \
+    "$HOME/.local/share/systemd/user/gsr-focused-stop-share.service"
 
 install -m 0644 \
     "$PAYLOAD_DIR/.local/share/kwin/scripts/gsr-focus-publisher/metadata.json" \
@@ -57,6 +61,7 @@ qdbus-qt6 org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
 
 printf '%s\n' \
     'Installed focused GPU Screen Recorder integration.' \
-    'Default shortcut: Meta+Ctrl+Alt+E' \
+    'Start/stop shortcut: Meta+Ctrl+Alt+E' \
+    'Stop and share to YouTube shortcut: Meta+Ctrl+Alt+Y' \
     'The shortcut is configurable in KDE System Settings > Keyboard > Shortcuts > KWin.' \
     'If it is not immediately listed, log out and back in once.'

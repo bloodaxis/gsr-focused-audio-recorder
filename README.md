@@ -20,6 +20,8 @@ source, recording is refused instead of silently capturing the wrong audio.
 - Matches GPU Screen Recorder's application-audio list against the window class
   and title, including Proton/Wine executable names.
 - Uses one shortcut for start and stop.
+- A second shortcut stops, finalizes, and opens KDE/Dolphin's YouTube share
+  dialog for the completed recording.
 - Shows recording state through a native KDE StatusNotifierItem tray helper.
 - Watches the recorder with `pidfd_open()` instead of polling.
 - Saves recordings to `~/Videos/GPUScreenRecorder` by default.
@@ -29,6 +31,7 @@ source, recording is refused instead of silently capturing the wrong audio.
 - KDE Plasma 6 on Wayland
 - The `com.dec05eba.gpu_screen_recorder` Flatpak
 - `systemd --user`, `qdbus-qt6`, `kwriteconfig6`, and `notify-send`
+- KDE Purpose with its YouTube plugin and an Online Accounts YouTube account
 - x86-64 for the included prebuilt tray helper
 
 ## Install from a source download
@@ -48,8 +51,10 @@ cd gsr-focused-audio-recorder
 ./install.sh
 ```
 
-The default shortcut is `Meta+Ctrl+Alt+E`. It is exposed in **System Settings →
-Keyboard → Shortcuts → KWin** as “Toggle focused application recording.”
+The shortcuts are exposed in **System Settings → Keyboard → Shortcuts → KWin**:
+
+- `Meta+Ctrl+Alt+E`: start or stop normally
+- `Meta+Ctrl+Alt+Y`: stop, finalize, and open the YouTube share dialog
 
 ## Repository layout
 
@@ -88,8 +93,8 @@ podman run --rm \
   -v "$out:/out:Z" \
   fedora:44 bash -lc '
     dnf install -y --setopt=install_weak_deps=False \
-      cmake ninja-build gcc-c++ qt6-qtbase-devel \
-      kf6-kstatusnotifieritem-devel &&
+      cmake ninja-build gcc-c++ qt6-qtbase-devel qt6-qtdeclarative-devel \
+      kf6-kstatusnotifieritem-devel kf6-purpose-devel &&
     cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release &&
     cmake --build /tmp/build &&
     cp /tmp/build/gsr-focused-tray /out/
@@ -97,6 +102,8 @@ podman run --rm \
 
 install -Dm755 "$out/gsr-focused-tray" \
   "$PWD/payload/.local/bin/gsr-focused-tray"
+install -Dm755 "$out/gsr-share-youtube" \
+  "$PWD/payload/.local/bin/gsr-share-youtube"
 ```
 
 The binary is dynamically linked against Qt 6 and KDE Frameworks 6.

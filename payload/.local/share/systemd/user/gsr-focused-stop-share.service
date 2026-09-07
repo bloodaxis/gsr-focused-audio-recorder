@@ -1,0 +1,6 @@
+[Unit]
+Description=Stop focused recording and open KDE YouTube sharing
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gsr-focused-stop-share
