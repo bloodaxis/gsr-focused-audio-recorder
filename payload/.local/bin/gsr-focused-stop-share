@@ -42,4 +42,13 @@ if [[ "$active" == true ]]; then
 else
     notify-send "GPU Screen Recorder" "Opening the last finalized recording in YouTube share"
 fi
-exec "$HOME/.local/bin/gsr-share-youtube" "$output"
+set +e
+"$HOME/.local/bin/gsr-share-youtube" "$output"
+share_status=$?
+set -e
+
+# The Purpose/YouTube helper can leave Plasma with a stale tray representation
+# after its dialog closes. Re-assert the idle state once the helper is gone.
+qdbus-qt6 org.odin.GsrTray /Tray \
+    org.odin.GsrTray.SetRecording false "" 0 >/dev/null 2>&1 || true
+exit "$share_status"
