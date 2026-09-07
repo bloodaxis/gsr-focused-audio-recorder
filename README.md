@@ -87,25 +87,18 @@ They can be added as `Environment=` entries in
 ## Build the tray helper on immutable Fedora/Bazzite
 
 ```bash
-src="$PWD/src/gsr-focused-tray"
-out="$(mktemp -d)"
+./src/gsr-focused-tray/build-container.sh
 
-podman run --rm \
-  -v "$src:/src:ro,Z" \
-  -v "$out:/out:Z" \
-  fedora:44 bash -lc '
-    dnf install -y --setopt=install_weak_deps=False \
-      cmake ninja-build gcc-c++ qt6-qtbase-devel qt6-qtdeclarative-devel \
-      kf6-kstatusnotifieritem-devel kf6-purpose-devel &&
-    cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release &&
-    cmake --build /tmp/build &&
-    cp /tmp/build/gsr-focused-tray /out/
-  '
-
-install -Dm755 "$out/gsr-focused-tray" \
+install -Dm755 src/gsr-focused-tray/build-output/gsr-focused-tray \
   "$PWD/payload/.local/bin/gsr-focused-tray"
-install -Dm755 "$out/gsr-share-youtube" \
+install -Dm755 src/gsr-focused-tray/build-output/gsr-share-youtube \
   "$PWD/payload/.local/bin/gsr-share-youtube"
 ```
+
+The first build creates the persistent image
+`localhost/gsr-focused-tray-builder:fedora44` and named container
+`gsr-focused-tray-builder`. Later builds restart that stopped container and
+reuse its installed toolchain. The `Containerfile` is stored beside the C++
+source.
 
 The binary is dynamically linked against Qt 6 and KDE Frameworks 6.

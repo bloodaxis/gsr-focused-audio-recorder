@@ -21,7 +21,9 @@ public:
     explicit TrayController(QObject *parent = nullptr)
         : QObject(parent), tray_(new KStatusNotifierItem(QStringLiteral("gsr-focused-recorder"), this)) {
         tray_->setTitle(QStringLiteral("Focused Screen Recorder"));
-        tray_->setCategory(KStatusNotifierItem::SystemServices);
+        // Plasma may auto-hide SystemServices even while their status is Active.
+        // This is a user-facing recording indicator and must remain visible.
+        tray_->setCategory(KStatusNotifierItem::ApplicationStatus);
         tray_->setStatus(KStatusNotifierItem::Active);
         tray_->setStandardActionsEnabled(false);
 

@@ -1,0 +1,13 @@
+FROM fedora:44
+
+RUN dnf install -y --setopt=install_weak_deps=False \
+        cmake \
+        ninja-build \
+        gcc-c++ \
+        qt6-qtbase-devel \
+        qt6-qtdeclarative-devel \
+        kf6-kstatusnotifieritem-devel \
+        kf6-purpose-devel \
+    && dnf clean all
+
+CMD ["bash", "-lc", "rm -rf /tmp/build && cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/build && cp /tmp/build/gsr-focused-tray /tmp/build/gsr-share-youtube /out/"]
