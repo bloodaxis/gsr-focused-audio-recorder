@@ -3,4 +3,6 @@ Description=Stop focused recording and open KDE YouTube sharing
 
 [Service]
 Type=oneshot
+# The upload helper outlives the share dialog after the upload completes.
+KillMode=process
 ExecStart=%h/.local/bin/gsr-focused-stop-share

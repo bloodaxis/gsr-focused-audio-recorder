@@ -23,6 +23,9 @@ source, recording is refused instead of silently capturing the wrong audio.
 - A second shortcut stops, finalizes, and opens KDE/Dolphin's YouTube share
   dialog for the completed recording. When nothing is recording, it shares the
   last successfully finalized recording instead.
+- Shows a separate YouTube upload tray indicator. It stays after a successful
+  upload until you open the video from the icon or dismiss it. During upload,
+  clicking the icon opens YouTube Studio.
 - Shows recording state through a native KDE StatusNotifierItem tray helper.
 - Watches the recorder with `pidfd_open()` instead of polling.
 - Saves recordings to `~/Videos/GPUScreenRecorder` by default.
@@ -33,7 +36,23 @@ source, recording is refused instead of silently capturing the wrong audio.
 - The `com.dec05eba.gpu_screen_recorder` Flatpak
 - `systemd --user`, `qdbus-qt6`, `kwriteconfig6`, and `notify-send`
 - KDE Purpose with its YouTube plugin and an Online Accounts YouTube account
-- x86-64 for the included prebuilt tray helper
+- x86-64 Fedora 44/Bazzite with compatible Qt 6 and KDE Frameworks 6 runtime
+  libraries for the included release binaries
+
+## Install a release package
+
+Download `gsr-focused-audio-recorder-v1.0.0-linux-x86_64.tar.gz` and its
+`.sha256` file from the GitHub release, then verify, extract, and install:
+
+```bash
+sha256sum -c gsr-focused-audio-recorder-v1.0.0-linux-x86_64.tar.gz.sha256
+tar -xzf gsr-focused-audio-recorder-v1.0.0-linux-x86_64.tar.gz
+cd gsr-focused-audio-recorder-v1.0.0
+./install.sh
+```
+
+Restart Dolphin after installation so it loads the updated Purpose YouTube
+plugin. An upload already in progress keeps using its existing helper process.
 
 ## Install from a source download
 
@@ -64,9 +83,13 @@ The installable files mirror their destinations beneath `payload/`:
 
 ```text
 payload/.local/bin/                                  recorder scripts and tray binary
+payload/.local/libexec/                              YouTube upload tray binary
+payload/.local/lib64/qt6/plugins/kf6/purpose/        YouTube Purpose plugin binary
+payload/.local/share/kf6/purpose/                    YouTube visibility configuration
 payload/.local/share/systemd/user/                   user services
 payload/.local/share/kwin/scripts/gsr-focus-publisher/  KWin script package
 src/gsr-focused-tray/                                Qt 6/KDE tray-helper source
+src/purpose-youtube/                                  Purpose source patch and tray source
 ```
 
 ## Recording options
@@ -101,4 +124,11 @@ The first build creates the persistent image
 reuse its installed toolchain. The `Containerfile` is stored beside the C++
 source.
 
-The binary is dynamically linked against Qt 6 and KDE Frameworks 6.
+The binaries are dynamically linked against Qt 6 and KDE Frameworks 6. The
+YouTube plugin changes are based on KDE Purpose commit
+`8473417a25a9a7c7ba137d34289063b8053c403e`; see
+`src/purpose-youtube/README.md` for source and build details.
+
+To create the installable archive from the checked-in payload, run
+`./build-release.sh v1.0.0`. It writes the archive and SHA-256 checksum to
+`dist/`.

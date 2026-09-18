@@ -23,6 +23,9 @@ flatpak info com.dec05eba.gpu_screen_recorder >/dev/null 2>&1 || {
 
 install -d \
     "$HOME/.local/bin" \
+    "$HOME/.local/libexec" \
+    "$HOME/.local/lib64/qt6/plugins/kf6/purpose" \
+    "$HOME/.local/share/kf6/purpose" \
     "$HOME/.local/share/systemd/user" \
     "$HOME/.local/share/kwin/scripts/gsr-focus-publisher/contents/code"
 
@@ -36,6 +39,13 @@ for script in \
     gsr-share-youtube; do
     install -m 0755 "$PAYLOAD_DIR/.local/bin/$script" "$HOME/.local/bin/$script"
 done
+
+install -m 0755 "$PAYLOAD_DIR/.local/libexec/purpose-youtube-tray" \
+    "$HOME/.local/libexec/purpose-youtube-tray"
+install -m 0644 "$PAYLOAD_DIR/.local/lib64/qt6/plugins/kf6/purpose/youtubeplugin.so" \
+    "$HOME/.local/lib64/qt6/plugins/kf6/purpose/youtubeplugin.so"
+install -m 0644 "$PAYLOAD_DIR/.local/share/kf6/purpose/youtubeplugin_config.qml" \
+    "$HOME/.local/share/kf6/purpose/youtubeplugin_config.qml"
 
 install -m 0644 "$PAYLOAD_DIR/.local/share/systemd/user/gsr-focused-recorder.service" \
     "$HOME/.local/share/systemd/user/gsr-focused-recorder.service"

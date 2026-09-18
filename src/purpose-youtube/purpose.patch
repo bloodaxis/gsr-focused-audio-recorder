@@ -1,0 +1,295 @@
+diff --git a/src/plugins/youtube/CMakeLists.txt b/src/plugins/youtube/CMakeLists.txt
+index fc98322..8525d22 100644
+--- a/src/plugins/youtube/CMakeLists.txt
++++ b/src/plugins/youtube/CMakeLists.txt
+@@ -6,6 +6,11 @@ endif()
+ 
+ add_share_plugin(youtubeplugin youtubeplugin.cpp youtubejob.cpp youtubejobcomposite.cpp)
+ target_link_libraries(youtubeplugin KF6::WidgetsAddons KF6::KIOCore Qt6::Network KF6::I18n KF6::Purpose)
++target_compile_definitions(youtubeplugin PRIVATE YOUTUBE_TRAY_INSTALL_DIR="${KDE_INSTALL_FULL_LIBEXECDIR}")
++
++add_executable(purpose-youtube-tray youtubetray.cpp)
++target_link_libraries(purpose-youtube-tray Qt6::Widgets Qt6::Network)
++install(TARGETS purpose-youtube-tray DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+ 
+ if (KAccounts6_FOUND)
+     target_compile_definitions(youtubeplugin PRIVATE -DHAVE_KACCOUNTS=1)
+diff --git a/src/plugins/youtube/youtubejob.cpp b/src/plugins/youtube/youtubejob.cpp
+index 91d0f17..a2478af 100644
+--- a/src/plugins/youtube/youtubejob.cpp
++++ b/src/plugins/youtube/youtubejob.cpp
+@@ -12,6 +12,13 @@
+ #include <QJsonDocument>
+ #include <QJsonObject>
+ #include <QNetworkReply>
++#include <QDir>
++#include <QFileInfo>
++#include <QLocalSocket>
++#include <QProcess>
++#include <QStandardPaths>
++#include <QUuid>
++#include <QTimer>
+ 
+ static const QUrl apiUrl(QStringLiteral("https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&uploadType=resumable"));
+ static const QString watchUrl = QStringLiteral("https://www.youtube.com/watch?v=");
+@@ -21,11 +28,15 @@ YoutubeJob::YoutubeJob(const QUrl &url,
+                        const QString &title,
+                        const QStringList &tags,
+                        const QString &description,
++                       const QString &privacyStatus,
+                        QObject *parent)
+     : KJob(parent)
+     , m_url(url)
+     , m_token(accessToken)
+ {
++    const QStringList validPrivacyStatuses{QStringLiteral("public"), QStringLiteral("unlisted"), QStringLiteral("private")};
++    const QString validatedPrivacyStatus = validPrivacyStatuses.contains(privacyStatus) ? privacyStatus : QStringLiteral("private");
++
+     m_metadata = QByteArray("{ "
+         "\"snippet\": {"
+             "\"title\": \"" + title.toUtf8() + "\", "
+@@ -34,14 +45,71 @@ YoutubeJob::YoutubeJob(const QUrl &url,
+             "\"tags\": [ \"" + tags.join(QStringLiteral("\", \"")).toUtf8() + "\" ] "
+         "}, "
+         "\"status\": { "
+-            "\"privacyStatus\": \"public\" "
++            "\"privacyStatus\": \"" + validatedPrivacyStatus.toUtf8() + "\" "
+         "} "
+     "}");
+ }
+ 
+ void YoutubeJob::start()
+ {
+-    createLocation();
++    startTray();
++}
++
++void YoutubeJob::beginUpload()
++{
++    if (!m_uploadStarted) {
++        m_uploadStarted = true;
++        createLocation();
++    }
++}
++
++void YoutubeJob::startTray()
++{
++    const QString helper = QStandardPaths::findExecutable(QStringLiteral("purpose-youtube-tray"),
++        {QDir::homePath() + QStringLiteral("/.local/libexec"), QStringLiteral(YOUTUBE_TRAY_INSTALL_DIR)});
++    if (helper.isEmpty()) {
++        qWarning() << "YouTube tray helper is not installed";
++        beginUpload();
++        return;
++    }
++    m_trayServer.setSocketOptions(QLocalServer::UserAccessOption);
++    if (!m_trayServer.listen(QStringLiteral("purpose-youtube-%1").arg(QUuid::createUuid().toString(QUuid::Id128)))) {
++        qWarning() << "Unable to create YouTube progress socket";
++        beginUpload();
++        return;
++    }
++    connect(&m_trayServer, &QLocalServer::newConnection, this, [this] {
++        m_traySocket = m_trayServer.nextPendingConnection();
++        m_traySocket->setParent(this);
++        m_trayServer.close();
++        m_traySocket->write(m_traySnapshot);
++        m_traySocket->flush();
++        connect(m_traySocket, &QLocalSocket::disconnected, m_traySocket, &QObject::deleteLater);
++        beginUpload();
++    });
++    updateTray(QStringLiteral("preparing"));
++    if (!QProcess::startDetached(helper, {QStringLiteral("--socket"), m_trayServer.fullServerName()})) {
++        qWarning() << "Unable to start YouTube progress indicator";
++        m_trayServer.close();
++        beginUpload();
++    }
++    // Let the indicator connect before an immediate upload error can destroy
++    // this job, but never make a failed tray launch block the upload.
++    QTimer::singleShot(3000, this, &YoutubeJob::beginUpload);
++}
++
++void YoutubeJob::updateTray(const QString &state, const QString &detail)
++{
++    const QJsonObject status{{QStringLiteral("state"), state},
++                             {QStringLiteral("name"), QFileInfo(m_url.path()).fileName()},
++                             {QStringLiteral("sent"), m_sent},
++                             {QStringLiteral("total"), m_total},
++                             {QStringLiteral("detail"), detail}};
++    m_traySnapshot = QJsonDocument(status).toJson(QJsonDocument::Compact) + '\n';
++    if (m_traySocket && m_traySocket->state() == QLocalSocket::ConnectedState) {
++        m_traySocket->write(m_traySnapshot);
++        m_traySocket->flush();
++    }
+ }
+ 
+ void YoutubeJob::fileFetched(KJob *j)
+@@ -49,7 +117,9 @@ void YoutubeJob::fileFetched(KJob *j)
+     if (j->error()) {
+         setError(j->error());
+         setErrorText(j->errorText());
++        updateTray(QStringLiteral("error"), errorText());
+         emitResult();
++        return;
+     }
+     KIO::StoredTransferJob *job = qobject_cast<KIO::StoredTransferJob *>(j);
+ 
+@@ -76,6 +146,7 @@ void YoutubeJob::locationCreated()
+     if (reply->error()) {
+         setError(reply->error());
+         setErrorText(reply->errorString());
++        updateTray(QStringLiteral("error"), errorText());
+         qWarning() << "couldn't upload file" << reply->readAll();
+         emitResult();
+         return;
+@@ -97,11 +168,19 @@ void YoutubeJob::uploadVideo(const QByteArray &data)
+     req.setRawHeader("Authorization", "Bearer " + m_token);
+ 
+     setTotalAmount(Bytes, data.size());
++    m_total = data.size();
++    updateTray(QStringLiteral("uploading"));
+     auto reply = m_manager.post(req, data);
+     connect(reply, &QNetworkReply::finished, this, &YoutubeJob::videoUploaded);
+-    connect(reply, &QNetworkReply::uploadProgress, this, [this](quint64 bytesSent, quint64 bytesTotal) {
++    connect(reply, &QNetworkReply::uploadProgress, this, [this](qint64 bytesSent, qint64 bytesTotal) {
++        if (bytesSent < 0 || bytesTotal <= 0) {
++            return;
++        }
++        m_sent = bytesSent;
++        m_total = bytesTotal;
+         setProcessedAmount(Bytes, bytesSent);
+         setPercent(bytesTotal == 0 ? 0 : (bytesSent * 100) / bytesTotal);
++        updateTray(bytesSent >= bytesTotal ? QStringLiteral("waiting") : QStringLiteral("uploading"));
+     });
+     connect(reply, &QNetworkReply::errorOccurred, this, [](QNetworkReply::NetworkError e) {
+         qDebug() << "upload error" << e;
+@@ -114,13 +193,23 @@ void YoutubeJob::videoUploaded()
+     if (reply->error()) {
+         setError(reply->error());
+         setErrorText(reply->errorString());
++        updateTray(QStringLiteral("error"), errorText());
+         qWarning() << "couldn't finish upload" << reply->readAll();
+         emitResult();
+         return;
+     }
+ 
+     auto doc = QJsonDocument::fromJson(reply->readAll()).object();
+-    m_output = watchUrl + doc.value(QLatin1String("id")).toString();
++    const QString videoId = doc.value(QLatin1String("id")).toString();
++    if (videoId.isEmpty()) {
++        setError(1);
++        setErrorText(QStringLiteral("YouTube did not return a video ID."));
++        updateTray(QStringLiteral("error"), errorText());
++        emitResult();
++        return;
++    }
++    m_output = watchUrl + videoId;
++    updateTray(QStringLiteral("complete"), m_output);
+     emitResult();
+ }
+ 
+diff --git a/src/plugins/youtube/youtubejob.h b/src/plugins/youtube/youtubejob.h
+index a27e0ae..4e9b1c7 100644
+--- a/src/plugins/youtube/youtubejob.h
++++ b/src/plugins/youtube/youtubejob.h
+@@ -11,12 +11,22 @@
+ #include <QNetworkAccessManager>
+ #include <QString>
+ #include <QUrl>
++#include <QLocalServer>
++#include <QPointer>
++
++class QLocalSocket;
+ 
+ class YoutubeJob : public KJob
+ {
+     Q_OBJECT
+ public:
+-    YoutubeJob(const QUrl &url, const QByteArray &token, const QString &title, const QStringList &tags, const QString &description, QObject *parent = nullptr);
++    YoutubeJob(const QUrl &url,
++               const QByteArray &token,
++               const QString &title,
++               const QStringList &tags,
++               const QString &description,
++               const QString &privacyStatus,
++               QObject *parent = nullptr);
+     void start() override;
+ 
+     QString outputUrl() const
+@@ -30,6 +40,9 @@ private:
+     void locationCreated();
+     void uploadVideo(const QByteArray &data);
+     void videoUploaded();
++    void startTray();
++    void beginUpload();
++    void updateTray(const QString &state, const QString &detail = QString());
+ 
+     QUrl m_url;
+     QByteArray m_token;
+@@ -37,5 +50,11 @@ private:
+     QNetworkAccessManager m_manager;
+     QByteArray m_metadata;
+     QUrl m_uploadUrl;
++    QLocalServer m_trayServer;
++    QPointer<QLocalSocket> m_traySocket;
++    QByteArray m_traySnapshot;
++    qint64 m_sent = 0;
++    qint64 m_total = 0;
++    bool m_uploadStarted = false;
+ };
+ #endif /* YOUTUBEJOB_H */
+diff --git a/src/plugins/youtube/youtubejobcomposite.cpp b/src/plugins/youtube/youtubejobcomposite.cpp
+index 2fef93a..62f35db 100644
+--- a/src/plugins/youtube/youtubejobcomposite.cpp
++++ b/src/plugins/youtube/youtubejobcomposite.cpp
+@@ -118,6 +118,7 @@ void YoutubeJobComposite::doUpload(const QByteArray &accessToken)
+                                          data().value(QLatin1String("videoTitle")).toString(),
+                                          data().value(QLatin1String("videoTags")).toString().split(QLatin1Char(',')),
+                                          data().value(QLatin1String("videoDesc")).toString(),
++                                         data().value(QLatin1String("videoPrivacy")).toString(),
+                                          this);
+         connect(job, &KJob::finished, this, &YoutubeJobComposite::subjobFinished);
+         job->start();
+diff --git a/src/plugins/youtube/youtubeplugin.json b/src/plugins/youtube/youtubeplugin.json
+index b8baa61..c08c560 100644
+--- a/src/plugins/youtube/youtubeplugin.json
++++ b/src/plugins/youtube/youtubeplugin.json
+@@ -172,6 +172,7 @@
+         "videoDesc",
+         "videoTitle",
+         "videoTags",
++        "videoPrivacy",
+         "accountId"
+     ],
+     "X-Purpose-Constraints": [
+diff --git a/src/plugins/youtube/youtubeplugin_config.qml b/src/plugins/youtube/youtubeplugin_config.qml
+index 93ca3cf..90641e6 100644
+--- a/src/plugins/youtube/youtubeplugin_config.qml
++++ b/src/plugins/youtube/youtubeplugin_config.qml
+@@ -16,6 +16,7 @@ ColumnLayout {
+     property alias videoDesc: description.text
+     property alias videoTitle: title.text
+     property alias videoTags: tags.text
++    property string videoPrivacy: ["public", "unlisted", "private"][visibility.currentIndex]
+     property var accountId
+     property var urls
+     property var mimeType
+@@ -74,6 +75,20 @@ ColumnLayout {
+         placeholderText: i18nd("purpose6_youtube", "KDE, Kamoso")
+     }
+ 
++    Label {
++        text: i18nd("purpose6_youtube", "Visibility:")
++    }
++    ComboBox {
++        id: visibility
++        Layout.fillWidth: true
++        model: [
++            i18nd("purpose6_youtube", "Public"),
++            i18nd("purpose6_youtube", "Unlisted"),
++            i18nd("purpose6_youtube", "Private")
++        ]
++        currentIndex: 0
++    }
++
+     Label {
+         text: i18nd("purpose6_youtube", "Description:")
+     }
